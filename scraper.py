@@ -34,7 +34,7 @@ for archive_link in archive_links:
 
     # Picture URL. Check that there actually is a picture, as NASA sometimes
     # publishes videos instead.
-    picture_link = apod_soup.find(href=re.compile('image/'))
+    picture_link = apod_soup.find(href=re.compile('^image/'))
     if picture_link:
         picture_url = base + picture_link['href']
         picture_found = True
