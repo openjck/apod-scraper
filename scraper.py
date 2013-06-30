@@ -30,7 +30,7 @@ for archive_link in archive_links:
     # Explanation
     explanation_raw = re.search('<(b|(h3))>.*?Explanation.*?</(b|(h3))>\s*(.*?)\s*(</p>)?<p>', apod_html, re.DOTALL | re.IGNORECASE).group(5)
     explanation_utf = explanation_raw.decode(encoding) # Remember, we are working directly with apod_html, which was not passed through / decoded by BeautifulSoup.
-    explanation = '<p>' + oneline(explanation_utf) + '</p>'
+    explanation = oneline(explanation_utf)
 
     # Picture URL. Check that there actually is a picture, as NASA sometimes
     # publishes videos instead.
