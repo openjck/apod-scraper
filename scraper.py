@@ -1,24 +1,33 @@
 from bs4 import BeautifulSoup
-import scraperwiki
-import re
 import dateutil.parser as parser
+import re
+import scraperwiki
+import urlparse
+
+# Return a soup with all links turned absolute.
+# See: http://stackoverflow.com/a/4468467/715866
+def absolute_soup(html, encoding, base):
+    soup = BeautifulSoup(html, from_encoding=encoding)
+    for tag in soup.findAll('a', href=True):
+        tag['href'] = urlparse.urljoin(base, tag['href'])
+    return soup
 
 # Reformat markup to remove arbitrary linebreaks.
 def oneline(html):
     return re.sub('\s+', ' ', html)
 
-base = 'http://apod.nasa.gov/apod/'
-archive = base + 'archivepix.html'
-encoding = 'latin-1'
+apod_base = 'http://apod.nasa.gov/apod/'
+apod_archive_url = apod_base + 'archivepix.html'
+apod_encoding = 'latin-1'
 
-archive_soup = BeautifulSoup(scraperwiki.scrape(archive), from_encoding=encoding)
-archive_links = archive_soup.find_all(href=re.compile('ap.*[0-9]+\.html'))
+archive_soup = absolute_soup(scraperwiki.scrape(apod_archive_url), apod_encoding, apod_base)
+archive_links = archive_soup.find_all(href=re.compile('ap[0-9]+\.html'))
+
 for archive_link in archive_links:
-    apod_html = scraperwiki.scrape(base + archive_link['href'])
-    apod_soup = BeautifulSoup(apod_html, from_encoding=encoding)
+    page_soup = absolute_soup(scraperwiki.scrape(archive_link['href']), apod_encoding, apod_base)
 
     # URL
-    url = base + archive_link['href']
+    url = archive_link['href']
 
     # Date
     date_raw = archive_link.previous_sibling[:-3]
@@ -28,15 +37,15 @@ for archive_link in archive_links:
     title = archive_link.text
 
     # Explanation
-    explanation_raw = re.search('<(b|(h3))>.*?Explanation.*?</(b|(h3))>\s*(.*?)\s*(</p>)?<p>', apod_html, re.DOTALL | re.IGNORECASE).group(5)
-    explanation_utf = explanation_raw.decode(encoding) # Remember, we are working directly with apod_html, which was not passed through / decoded by BeautifulSoup.
-    explanation = oneline(explanation_utf)
+    page_html = str(page_soup) # The raw HTML, but with links turned absolute.
+    explanation_ugly = re.search('<(b|(h3))>.*?Explanation.*?</(b|(h3))>\s*(.*?)\s*(</p>)?<p>', page_html, re.DOTALL | re.IGNORECASE).group(5)
+    explanation = oneline(explanation_ugly)
 
     # Picture URL. Check that there actually is a picture, as NASA sometimes
     # publishes videos instead.
-    picture_link = apod_soup.find(href=re.compile('^image/'))
+    picture_link = page_soup.find(href=re.compile(apod_base + 'image/'))
     if picture_link:
-        picture_url = base + picture_link['href']
+        picture_url = picture_link['href']
         picture_found = True
     else:
         picture_found = False
