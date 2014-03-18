@@ -1,56 +1,101 @@
+#!/usr/bin/env python
+
 from bs4 import BeautifulSoup
-import dateutil.parser as parser
+from dateutil import parser
 import re
+import requests
 import scraperwiki
 import urlparse
 
-# Return a soup with all links turned absolute.
-# See: http://stackoverflow.com/a/4468467/715866
-def absolute_soup(html, encoding, base):
-    soup = BeautifulSoup(html, from_encoding=encoding)
-    for tag in soup.findAll('a', href=True):
-        tag['href'] = urlparse.urljoin(base, tag['href'])
+class Page:
+    def __init__(self, path, basename, encoding):
+        self.path = path
+        self.basename = basename
+        self.encoding = encoding
+        self.url = path + basename
+
+class Archive(Page):
+    def __init__(self, path, basename, encoding):
+        Page.__init__(self, path, basename, encoding)
+
+    @property
+    def links(self):
+        link_re = 'ap[0-9]+\.html'
+        soup = make_soup(self.url, self.encoding, parser='html.parser')
+        return soup.find_all(href=re.compile(link_re))
+
+class Entry(Page):
+    def __init__(self, path, basename, encoding, link):
+        Page.__init__(self, path, basename, encoding)
+        self.link = link
+
+    @property
+    def entry_url(self):
+        return self.url
+
+    @property
+    def date(self):
+        date_raw = self.link.previous_sibling[:-3]
+        date = parser.parse(date_raw).strftime('%Y-%m-%d')
+        return unicode(date, 'UTF-8')
+
+    @property
+    def title(self):
+        return self.link.text
+
+    @property
+    def explanation(self):
+        soup = make_soup(self.url, self.encoding, True, self.path)
+        html = str(soup)
+        explanation_with_linebreaks = re.search('<(b|(h3))>.*?Explanation.*?</(b|(h3))>\s*(.*?)\s*(</p>)?<p>', html, re.DOTALL | re.IGNORECASE).group(5)
+        explanation_without_linebreaks = re.sub('\s+', ' ', explanation_with_linebreaks)
+        return unicode(explanation_without_linebreaks, 'UTF-8')
+
+    @property
+    def picture_url(self):
+        soup = make_soup(self.url, self.encoding, True, self.path)
+        picture_link = soup.find(href=re.compile(self.path.replace('.', '\.') + 'image/'))
+
+        # Check that there is a picture (APOD sometimes publishes videos instead).
+        if picture_link:
+            picture_url = picture_link['href']
+        else:
+            picture_url = ''
+
+        return unicode(picture_url, 'UTF-8')
+
+def make_soup(url, encoding, absolute=False, base='', parser=None):
+    html = requests.get(url)
+
+    if parser:
+        soup = BeautifulSoup(html.content, parser, from_encoding=encoding)
+    else:
+        soup = BeautifulSoup(html.content, from_encoding=encoding)
+
+    # Make all links absolute.
+    # http://stackoverflow.com/a/4468467/715866
+    if absolute:
+        for a in soup.find_all('a', href=True):
+            a['href'] = urlparse.urljoin(base, a['href'])
+
     return soup
 
-# Reformat markup to remove arbitrary linebreaks.
-def oneline(html):
-    return re.sub('\s+', ' ', html)
+def save(url, date, title, explanation, picture_url):
+    primary_keys = ['url']
+    data = {'url': url, 'date': date, 'title': title, 'explanation': explanation, 'picture_url': picture_url}
+    scraperwiki.sql.save(primary_keys, data)
 
-apod_base = 'http://apod.nasa.gov/apod/'
-apod_archive_url = apod_base + 'archivepix.html'
-apod_encoding = 'latin-1'
+def main():
+    path = 'http://apod.nasa.gov/apod/'
+    site_encoding = 'windows-1252'
+    archive = Archive(path, 'archivepix.html', site_encoding)
 
-archive_soup = absolute_soup(scraperwiki.scrape(apod_archive_url), apod_encoding, apod_base)
-archive_links = archive_soup.find_all(href=re.compile('ap[0-9]+\.html'))
+    for link in archive.links:
+        entry = Entry(path, link['href'], site_encoding, link)
 
-for archive_link in archive_links:
-    page_soup = absolute_soup(scraperwiki.scrape(archive_link['href']), apod_encoding, apod_base)
+        # APOD sometimes publishes videos instead. Don't save those.
+        if entry.picture_url:
+            save(entry.entry_url, entry.date, entry.title, entry.explanation, entry.picture_url)
 
-    # URL
-    url = archive_link['href']
-
-    # Date
-    date_raw = archive_link.previous_sibling[:-3]
-    date = parser.parse(date_raw).strftime('%Y-%m-%d')
-
-    # Title
-    title = archive_link.text
-
-    # Explanation
-    page_html = str(page_soup) # The raw HTML, but with links turned absolute.
-    explanation_ugly = re.search('<(b|(h3))>.*?Explanation.*?</(b|(h3))>\s*(.*?)\s*(</p>)?<p>', page_html, re.DOTALL | re.IGNORECASE).group(5)
-    explanation = oneline(explanation_ugly)
-
-    # Picture URL. Check that there actually is a picture, as NASA sometimes
-    # publishes videos instead.
-    picture_link = page_soup.find(href=re.compile(apod_base + 'image/'))
-    if picture_link:
-        picture_url = picture_link['href']
-        picture_found = True
-    else:
-        picture_found = False
-
-    # Save!
-    if picture_found:
-        record = {'url': url, 'date': date, 'title': title, 'explanation': explanation, 'picture_url': picture_url}
-        scraperwiki.sqlite.save(['url'], record)
+if __name__ == '__main__':
+    main()
