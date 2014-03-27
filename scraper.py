@@ -7,12 +7,14 @@ import requests
 import scraperwiki
 import urlparse
 
+
 class Page:
     def __init__(self, path, basename, encoding):
         self.path = path
         self.basename = basename
         self.encoding = encoding
         self.url = path + basename
+
 
 class Archive(Page):
     def __init__(self, path, basename, encoding):
@@ -23,6 +25,7 @@ class Archive(Page):
         link_re = 'ap[0-9]+\.html'
         soup = make_soup(self.url, self.encoding, parser='html.parser')
         return soup.find_all(href=re.compile(link_re))
+
 
 class Entry(Page):
     def __init__(self, path, basename, encoding, link):
@@ -64,6 +67,7 @@ class Entry(Page):
 
         return unicode(picture_url, 'UTF-8')
 
+
 def make_soup(url, encoding, absolute=False, base='', parser=None):
     html = requests.get(url)
 
@@ -80,10 +84,18 @@ def make_soup(url, encoding, absolute=False, base='', parser=None):
 
     return soup
 
+
 def save(url, date, title, explanation, picture_url):
+    data = {
+        'url': url,
+        'date': date,
+        'title': title,
+        'explanation': explanation,
+        'picture_url': picture_url,
+    }
     primary_keys = ['url']
-    data = {'url': url, 'date': date, 'title': title, 'explanation': explanation, 'picture_url': picture_url}
     scraperwiki.sql.save(primary_keys, data)
+
 
 def main():
     path = 'http://apod.nasa.gov/apod/'
@@ -96,6 +108,7 @@ def main():
         # APOD sometimes publishes videos instead. Don't save those.
         if entry.picture_url:
             save(entry.entry_url, entry.date, entry.title, entry.explanation, entry.picture_url)
+
 
 if __name__ == '__main__':
     main()
