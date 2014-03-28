@@ -85,7 +85,7 @@ def make_soup(url, encoding, absolute=False, base='', parser=None):
     return soup
 
 
-def save(url, date, title, explanation, picture_url):
+def save(url, date, title, explanation, picture_url, data_version):
     data = {
         'url': url,
         'date': date,
@@ -93,13 +93,23 @@ def save(url, date, title, explanation, picture_url):
         'explanation': explanation,
         'picture_url': picture_url,
     }
+
+    version_data = {
+        'url': url,
+        'data_version': data_version,
+    }
+
     primary_keys = ['url']
+
     scraperwiki.sql.save(primary_keys, data)
+    scraperwiki.sql.save(primary_keys, version_data, table_name='data_versions')
 
 
 def main():
+    version = '1.0.0'
     path = 'http://apod.nasa.gov/apod/'
     site_encoding = 'windows-1252'
+
     archive = Archive(path, 'archivepix.html', site_encoding)
 
     for link in archive.links:
@@ -107,7 +117,7 @@ def main():
 
         # APOD sometimes publishes videos instead. Don't save those.
         if entry.picture_url:
-            save(entry.entry_url, entry.date, entry.title, entry.explanation, entry.picture_url)
+            save(entry.entry_url, entry.date, entry.title, entry.explanation, entry.picture_url, data_version=version)
 
 
 if __name__ == '__main__':
