@@ -114,9 +114,12 @@ def main():
 
     for link in archive.links:
         entry = Entry(path, link['href'], site_encoding, link)
+        result = scraperwiki.sql.select('url, data_version FROM data_versions WHERE url = "%s" LIMIT 1' % entry.entry_url)
 
-        # APOD sometimes publishes videos instead. Don't save those.
-        if entry.picture_url:
+        # Only scrape and save the page if it contains a picture (APOD sometimes
+        # publishes videos instead) and if it has not already been scraped at
+        # this version.
+        if (not result or result[0]['data_version'] != version) and entry.picture_url:
             save(entry.entry_url, entry.date, entry.title, entry.explanation, entry.picture_url, data_version=version)
 
 
