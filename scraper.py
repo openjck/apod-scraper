@@ -48,7 +48,7 @@ class Entry(Page):
 
     @property
     def explanation(self):
-        soup = make_soup(self.url, self.encoding, True, self.path)
+        soup = self.get_soup()
         html = str(soup)
         explanation_with_linebreaks = re.search('<(b|(h3))>.*?Explanation.*?</(b|(h3))>\s*(.*?)\s*(</p>)?<p>', html, re.DOTALL | re.IGNORECASE).group(5)
         explanation_without_linebreaks = re.sub('\s+', ' ', explanation_with_linebreaks)
@@ -56,7 +56,7 @@ class Entry(Page):
 
     @property
     def picture_url(self):
-        soup = make_soup(self.url, self.encoding, True, self.path)
+        soup = self.get_soup()
         picture_link = soup.find(href=re.compile(self.path.replace('.', '\.') + 'image/'))
 
         # Check that there is a picture (APOD sometimes publishes videos instead).
@@ -66,6 +66,13 @@ class Entry(Page):
             picture_url = ''
 
         return unicode(picture_url, 'UTF-8')
+
+    # Cache the soup
+    def get_soup(self):
+        if not hasattr(self, 'soup'):
+            self.soup = make_soup(self.url, self.encoding, True, self.path)
+
+        return self.soup
 
 
 def make_soup(url, encoding, absolute=False, base='', parser=None):
