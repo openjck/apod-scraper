@@ -75,7 +75,7 @@ class Entry(Page):
         return self.soup
 
 
-def make_soup(url, encoding, absolute=False, base='', parser=None):
+def make_soup(url, encoding, absolute=False, base='', parser='lxml'):
     html = requests.get(url)
 
     if parser:
