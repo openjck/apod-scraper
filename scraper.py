@@ -112,21 +112,32 @@ def save(url, date, title, explanation, picture_url, data_version):
     scraperwiki.sql.save(primary_keys, version_data, table_name='data_versions')
 
 
+def table_exists(table):
+    try:
+        scraperwiki.sql.select('* FROM %s' % table)
+        return True
+    except:
+        return False
+
+
 def main():
     version = '1.0.0'
     path = 'http://apod.nasa.gov/apod/'
     site_encoding = 'windows-1252'
 
     archive = Archive(path, 'archivepix.html', site_encoding)
+    versions = table_exists('data_versions')
 
     for link in archive.links:
         entry = Entry(path, link['href'], site_encoding, link)
-        result = scraperwiki.sql.select('url, data_version FROM data_versions WHERE url = "%s" LIMIT 1' % entry.entry_url)
+
+        if versions:
+            result = scraperwiki.sql.select('url, data_version FROM data_versions WHERE url = "%s" LIMIT 1' % entry.entry_url)
 
         # Only scrape and save the page if it contains a picture (APOD sometimes
         # publishes videos instead) and if it has not already been scraped at
         # this version.
-        if (not result or result[0]['data_version'] != version) and entry.picture_url:
+        if (not versions or result[0]['data_version'] != version) and entry.picture_url:
             save(entry.entry_url, entry.date, entry.title, entry.explanation, entry.picture_url, data_version=version)
 
 
