@@ -137,7 +137,7 @@ def main():
         # Only scrape and save the page if it contains a picture (APOD sometimes
         # publishes videos instead) and if it has not already been scraped at
         # this version.
-        if (not versions or result[0]['data_version'] != version) and entry.picture_url:
+        if (not versions or not result or result[0]['data_version'] != version) and entry.picture_url:
             save(entry.entry_url, entry.date, entry.title, entry.explanation, entry.picture_url, data_version=version)
 
 
