@@ -121,7 +121,10 @@ def table_exists(table):
 
 
 def main():
+    # Change this number when the scraping altorighm changes. All pages will be
+    # re-scraped.
     version = '1.0.0'
+
     path = 'http://apod.nasa.gov/apod/'
     site_encoding = 'windows-1252'
 
