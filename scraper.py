@@ -113,7 +113,7 @@ class Entry(Page):
             video_url = ''
 
         return unicode(video_url, 'UTF-8')
-        
+
     # Cache the soup.
     def get_soup(self):
         if not hasattr(self, 'soup'):
