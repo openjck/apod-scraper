@@ -67,6 +67,18 @@ class Entry(Page):
 
         return unicode(picture_url, 'UTF-8')
 
+    @property
+    def video_url(self):
+        soup = self.get_soup()
+        video_link = soup.find('iframe')
+
+        if video_link:
+            video_url = video_link['src']
+        else:
+            video_url = ''
+
+        return unicode(video_url, 'UTF-8')
+        
     # Cache the soup.
     def get_soup(self):
         if not hasattr(self, 'soup'):
@@ -99,6 +111,7 @@ def save(url, date, title, explanation, picture_url, data_version):
         'title': title,
         'explanation': explanation,
         'picture_url': picture_url,
+        'video_url': video_url,
     }
 
     version_data = {
@@ -137,11 +150,10 @@ def main():
         if versions:
             result = scraperwiki.sql.select('url, data_version FROM data_versions WHERE url = "%s" LIMIT 1' % entry.entry_url)
 
-        # Only scrape and save the page if it contains a picture (APOD sometimes
-        # publishes videos instead) and if it has not already been scraped at
-        # this version.
-        if (not versions or not result or result[0]['data_version'] != version) and entry.picture_url:
-            save(entry.entry_url, entry.date, entry.title, entry.explanation, entry.picture_url, data_version=version)
+        # Only scrape and save the page if it contains a picture or video and
+        # if it has not already been scraped at this version.
+        if (not versions or not result or result[0]['data_version'] != version) and (entry.picture_url or entry.video_url):
+            save(entry.entry_url, entry.date, entry.title, entry.credit, entry.explanation, entry.picture_url, entry.video_url, data_version=version)
 
 
 if __name__ == '__main__':
