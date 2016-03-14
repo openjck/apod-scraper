@@ -58,13 +58,21 @@ class Entry(Page):
     @property
     def picture_url(self):
         soup = self.get_soup()
-        picture_link = soup.find(href=re.compile(self.path.replace('.', '\.') + 'image/'))
+        picture_link = soup.find('a', href=regex.compile(self.path.replace('.', '\.') + 'image/'))
 
-        # Check that there is a picture (APOD sometimes publishes videos instead).
+        # Check if there is a higher-resolution link to a picture.
         if picture_link:
             picture_url = picture_link['href']
         else:
-            picture_url = ''
+            # If there is no link to a higher-resolution picture, check if the
+            # page just has an image instead.
+            picture_link = soup.find('img', src=regex.compile('image/'))
+            if picture_link:
+                picture_url = self.path + picture_link['src']
+            else:
+                # If no image was found, then there must be a video or some
+                # other kind of object on the page.
+                picture_url = ''
 
         return unicode(picture_url, 'UTF-8')
 
