@@ -104,7 +104,7 @@ def make_soup(url, encoding, absolute=False, base='', parser='lxml'):
     return soup
 
 
-def save(url, date, title, explanation, picture_url, data_version):
+def save(url, date, title, explanation, picture_url, video_url, data_version):
     data = {
         'url': url,
         'date': date,
