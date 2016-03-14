@@ -74,9 +74,12 @@ class Entry(Page):
     def explanation(self):
         soup = self.get_soup()
         html = str(soup)
-        explanation_with_linebreaks = regex.search('<(b|(h3))>.*?Explanation.*?</(b|(h3))>\s*(.*?)\s*(</p>)?<p>', html, regex.DOTALL | regex.IGNORECASE).group(5)
-        explanation_without_linebreaks = regex.sub('\s+', ' ', explanation_with_linebreaks)
-        return unicode(explanation_without_linebreaks, 'UTF-8')
+        match = regex.search('<(?:b|h3)>\s*?Explanation(?::)?\s*?<\/(?:b|h3)>(?::)?(.*?)<p>', html, regex.DOTALL | regex.IGNORECASE)
+        if match:
+            explanation = ' '.join(bleach.clean(match.group(1), tags=['a'], attributes={'a': ['href']}, strip=True).split())
+        else:
+            explanation = ''
+        return explanation
 
     @property
     def picture_url(self):
