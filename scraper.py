@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
+import bleach
 from bs4 import BeautifulSoup
 from collections import OrderedDict
 from dateutil import parser
-import re
+import regex
 import requests
 import scraperwiki
 import urlparse
@@ -25,7 +26,7 @@ class Archive(Page):
     def links(self):
         link_re = 'ap[0-9]+\.html'
         soup = make_soup(self.url, self.encoding, parser='html.parser')
-        return soup.find_all(href=re.compile(link_re))
+        return soup.find_all(href=regex.compile(link_re))
 
 
 class Entry(Page):
@@ -48,11 +49,33 @@ class Entry(Page):
         return self.link.text
 
     @property
+    def credit(self):
+        soup = self.get_soup()
+        html = str(soup)
+        # The credit information is always below the title. Sometimes the title
+        # on the picture page is slightly different from the title on the index
+        # page, however, so fuzzy matching is used here to account for any
+        # differences.
+        match = regex.search('<b>\s*?(?:{0}){{e<={1}}}\s*?<(?:\/b|br.*?)>(.*?)<p>'.format(regex.escape(self.link.text.encode('UTF-8')), int(float(len(self.link.text)) * 0.25)), html, regex.DOTALL | regex.IGNORECASE)
+        if not match:
+            # If the above fails for some reason, one last attempt will be made
+            # to locate the credit information by searching between the title
+            # and the explanation.
+            match = regex.search('<b>.*?<(?:\/b|br.*?)>(.*?)<p>.*?<(?:b|h3)>\s*?Explanation(?::)?\s*?<\/(?:b|h3)>(?::)?', html, regex.DOTALL | regex.IGNORECASE)
+        if match:
+            # Remove all tags except the anchor tags, and remove all excess
+            # whitespace characters.
+            credit = ' '.join(bleach.clean(match.group(1), tags=['a'], attributes={'a': ['href']}, strip=True).split())
+        else:
+            credit = '';
+        return credit
+
+    @property
     def explanation(self):
         soup = self.get_soup()
         html = str(soup)
-        explanation_with_linebreaks = re.search('<(b|(h3))>.*?Explanation.*?</(b|(h3))>\s*(.*?)\s*(</p>)?<p>', html, re.DOTALL | re.IGNORECASE).group(5)
-        explanation_without_linebreaks = re.sub('\s+', ' ', explanation_with_linebreaks)
+        explanation_with_linebreaks = regex.search('<(b|(h3))>.*?Explanation.*?</(b|(h3))>\s*(.*?)\s*(</p>)?<p>', html, regex.DOTALL | regex.IGNORECASE).group(5)
+        explanation_without_linebreaks = regex.sub('\s+', ' ', explanation_with_linebreaks)
         return unicode(explanation_without_linebreaks, 'UTF-8')
 
     @property
@@ -113,11 +136,12 @@ def make_soup(url, encoding, absolute=False, base='', parser='lxml'):
     return soup
 
 
-def save(url, date, title, explanation, picture_url, video_url, data_version):
+def save(url, date, title, credit, explanation, picture_url, video_url, data_version):
     data = OrderedDict()
     data['url'] = url;
     data['date'] = date;
     data['title'] = title;
+    data['credit'] = credit;
     data['explanation'] = explanation;
     data['picture_url'] = picture_url;
     data['video_url'] = video_url;
