@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from bs4 import BeautifulSoup
+from collections import OrderedDict
 from dateutil import parser
 import re
 import requests
@@ -105,24 +106,20 @@ def make_soup(url, encoding, absolute=False, base='', parser='lxml'):
 
 
 def save(url, date, title, explanation, picture_url, video_url, data_version):
-    data = {
-        'url': url,
-        'date': date,
-        'title': title,
-        'explanation': explanation,
-        'picture_url': picture_url,
-        'video_url': video_url,
-    }
+    data = OrderedDict()
+    data['url'] = url;
+    data['date'] = date;
+    data['title'] = title;
+    data['explanation'] = explanation;
+    data['picture_url'] = picture_url;
+    data['video_url'] = video_url;
 
-    version_data = {
-        'url': url,
-        'data_version': data_version,
-    }
+    data_versions = OrderedDict()
+    data_versions['url'] = url;
+    data_versions['data_version'] = data_version;
 
-    primary_keys = ['url']
-
-    scraperwiki.sql.save(primary_keys, data)
-    scraperwiki.sql.save(primary_keys, version_data, table_name='data_versions')
+    scraperwiki.sql.save(['url'], data)
+    scraperwiki.sql.save(['url'], data_versions, table_name='data_versions')
 
 
 def table_exists(table):
