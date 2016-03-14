@@ -67,7 +67,7 @@ class Entry(Page):
 
         return unicode(picture_url, 'UTF-8')
 
-    # Cache the soup
+    # Cache the soup.
     def get_soup(self):
         if not hasattr(self, 'soup'):
             self.soup = make_soup(self.url, self.encoding, True, self.path)
@@ -121,7 +121,7 @@ def table_exists(table):
 
 
 def main():
-    # Change this number when the scraping altorighm changes. All pages will be
+    # Change this number when the scraping algorithm changes. All pages will be
     # re-scraped.
     version = '1.0.0'
 
