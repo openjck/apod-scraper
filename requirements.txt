@@ -1,0 +1,8 @@
+-e git+http://github.com/openaustralia/scraperwiki-python.git@morph_defaults#egg=scraperwiki
+
+bleach
+beautifulsoup4
+lxml
+python-dateutil
+regex
+requests
