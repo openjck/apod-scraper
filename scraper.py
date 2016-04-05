@@ -82,23 +82,28 @@ class Entry(Page):
         return explanation
 
     @property
+    def picture_thumbnail_url(self):
+        soup = self.get_soup()
+        picture_thumbail_link = soup.find('img', src=regex.compile('image/'))
+
+        # Check if there is a smaller version of the picture on the page.
+        if picture_thumbail_link:
+            picture_thumbnail_url = self.path + picture_thumbail_link['src']
+        else:
+            picture_thumbnail_url = ''
+
+        return unicode(picture_thumbnail_url, 'UTF-8')
+
+    @property
     def picture_url(self):
         soup = self.get_soup()
         picture_link = soup.find('a', href=regex.compile(self.path.replace('.', '\.') + 'image/'))
 
-        # Check if there is a higher-resolution link to a picture.
+        # Check if there is a higher-resolution link to the picture.
         if picture_link:
             picture_url = picture_link['href']
         else:
-            # If there is no link to a higher-resolution picture, check if the
-            # page just has an image instead.
-            picture_link = soup.find('img', src=regex.compile('image/'))
-            if picture_link:
-                picture_url = self.path + picture_link['src']
-            else:
-                # If no image was found, then there must be a video or some
-                # other kind of object on the page.
-                picture_url = ''
+            picture_url = ''
 
         return unicode(picture_url, 'UTF-8')
 
@@ -139,13 +144,14 @@ def make_soup(url, encoding, absolute=False, base='', parser='lxml'):
     return soup
 
 
-def save(url, date, title, credit, explanation, picture_url, video_url, data_version):
+def save(url, date, title, credit, explanation, picture_thumbnail_url, picture_url, video_url, data_version):
     data = OrderedDict()
     data['url'] = url;
     data['date'] = date;
     data['title'] = title;
     data['credit'] = credit;
     data['explanation'] = explanation;
+    data['picture_thumbnail_url'] = picture_thumbnail_url;
     data['picture_url'] = picture_url;
     data['video_url'] = video_url;
 
@@ -168,7 +174,7 @@ def table_exists(table):
 def main():
     # Change this number when the scraping algorithm changes. All pages will be
     # re-scraped.
-    version = '1.1.0'
+    version = '1.1.1'
 
     path = 'http://apod.nasa.gov/apod/'
     site_encoding = 'windows-1252'
@@ -184,8 +190,8 @@ def main():
 
         # Only scrape and save the page if it contains a picture or video and
         # if it has not already been scraped at this version.
-        if (not versions or not result or result[0]['data_version'] != version) and (entry.picture_url or entry.video_url):
-            save(entry.entry_url, entry.date, entry.title, entry.credit, entry.explanation, entry.picture_url, entry.video_url, data_version=version)
+        if (not versions or not result or result[0]['data_version'] != version) and (entry.picture_thumbnail_url or entry.video_url):
+            save(entry.entry_url, entry.date, entry.title, entry.credit, entry.explanation, entry.picture_thumbnail_url, entry.picture_url, entry.video_url, data_version=version)
 
 
 if __name__ == '__main__':
