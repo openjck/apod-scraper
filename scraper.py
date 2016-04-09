@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 
+import bleach
 from bs4 import BeautifulSoup
+from collections import OrderedDict
 from dateutil import parser
-import re
+import regex
 import requests
 import scraperwiki
 import urlparse
@@ -24,7 +26,7 @@ class Archive(Page):
     def links(self):
         link_re = 'ap[0-9]+\.html'
         soup = make_soup(self.url, self.encoding, parser='html.parser')
-        return soup.find_all(href=re.compile(link_re))
+        return soup.find_all(href=regex.compile(link_re))
 
 
 class Entry(Page):
@@ -47,19 +49,57 @@ class Entry(Page):
         return self.link.text
 
     @property
+    def credit(self):
+        soup = self.get_soup()
+        html = str(soup)
+        # The credit information is always below the title. Sometimes the title
+        # on the picture page is slightly different from the title on the index
+        # page, however, so fuzzy matching is used here to account for any
+        # differences.
+        match = regex.search('<b>\s*?(?:{0}){{e<={1}}}\s*?<(?:\/b|br.*?)>(.*?)<p>'.format(regex.escape(self.link.text.encode('UTF-8')), int(float(len(self.link.text)) * 0.25)), html, regex.DOTALL | regex.IGNORECASE)
+        if not match:
+            # If the above fails for some reason, one last attempt will be made
+            # to locate the credit information by searching between the title
+            # and the explanation.
+            match = regex.search('<b>.*?<(?:\/b|br.*?)>(.*?)<p>.*?<(?:b|h3)>\s*?Explanation(?::)?\s*?<\/(?:b|h3)>(?::)?', html, regex.DOTALL | regex.IGNORECASE)
+        if match:
+            # Remove all tags except the anchor tags, and remove all excess
+            # whitespace characters.
+            credit = ' '.join(bleach.clean(match.group(1), tags=['a'], attributes={'a': ['href']}, strip=True).split())
+        else:
+            credit = '';
+        return credit
+
+    @property
     def explanation(self):
         soup = self.get_soup()
         html = str(soup)
-        explanation_with_linebreaks = re.search('<(b|(h3))>.*?Explanation.*?</(b|(h3))>\s*(.*?)\s*(</p>)?<p>', html, re.DOTALL | re.IGNORECASE).group(5)
-        explanation_without_linebreaks = re.sub('\s+', ' ', explanation_with_linebreaks)
-        return unicode(explanation_without_linebreaks, 'UTF-8')
+        match = regex.search('<(?:b|h3)>\s*?Explanation(?::)?\s*?<\/(?:b|h3)>(?::)?(.*?)<p>', html, regex.DOTALL | regex.IGNORECASE)
+        if match:
+            explanation = ' '.join(bleach.clean(match.group(1), tags=['a'], attributes={'a': ['href']}, strip=True).split())
+        else:
+            explanation = ''
+        return explanation
+
+    @property
+    def picture_thumbnail_url(self):
+        soup = self.get_soup()
+        picture_thumbail_link = soup.find('img', src=regex.compile('image/'))
+
+        # Check if there is a smaller version of the picture on the page.
+        if picture_thumbail_link:
+            picture_thumbnail_url = self.path + picture_thumbail_link['src']
+        else:
+            picture_thumbnail_url = ''
+
+        return unicode(picture_thumbnail_url, 'UTF-8')
 
     @property
     def picture_url(self):
         soup = self.get_soup()
-        picture_link = soup.find(href=re.compile(self.path.replace('.', '\.') + 'image/'))
+        picture_link = soup.find('a', href=regex.compile(self.path.replace('.', '\.') + 'image/'))
 
-        # Check that there is a picture (APOD sometimes publishes videos instead).
+        # Check if there is a higher-resolution link to the picture.
         if picture_link:
             picture_url = picture_link['href']
         else:
@@ -67,7 +107,19 @@ class Entry(Page):
 
         return unicode(picture_url, 'UTF-8')
 
-    # Cache the soup
+    @property
+    def video_url(self):
+        soup = self.get_soup()
+        video_link = soup.find('iframe')
+
+        if video_link:
+            video_url = video_link['src']
+        else:
+            video_url = ''
+
+        return unicode(video_url, 'UTF-8')
+
+    # Cache the soup.
     def get_soup(self):
         if not hasattr(self, 'soup'):
             self.soup = make_soup(self.url, self.encoding, True, self.path)
@@ -92,24 +144,23 @@ def make_soup(url, encoding, absolute=False, base='', parser='lxml'):
     return soup
 
 
-def save(url, date, title, explanation, picture_url, data_version):
-    data = {
-        'url': url,
-        'date': date,
-        'title': title,
-        'explanation': explanation,
-        'picture_url': picture_url,
-    }
+def save(url, date, title, credit, explanation, picture_thumbnail_url, picture_url, video_url, data_version):
+    data = OrderedDict()
+    data['url'] = url;
+    data['date'] = date;
+    data['title'] = title;
+    data['credit'] = credit;
+    data['explanation'] = explanation;
+    data['picture_thumbnail_url'] = picture_thumbnail_url;
+    data['picture_url'] = picture_url;
+    data['video_url'] = video_url;
 
-    version_data = {
-        'url': url,
-        'data_version': data_version,
-    }
+    data_versions = OrderedDict()
+    data_versions['url'] = url;
+    data_versions['data_version'] = data_version;
 
-    primary_keys = ['url']
-
-    scraperwiki.sql.save(primary_keys, data)
-    scraperwiki.sql.save(primary_keys, version_data, table_name='data_versions')
+    scraperwiki.sql.save(['url'], data)
+    scraperwiki.sql.save(['url'], data_versions, table_name='data_versions')
 
 
 def table_exists(table):
@@ -121,9 +172,9 @@ def table_exists(table):
 
 
 def main():
-    # Change this number when the scraping altorighm changes. All pages will be
+    # Change this number when the scraping algorithm changes. All pages will be
     # re-scraped.
-    version = '1.0.0'
+    version = '1.1.1'
 
     path = 'http://apod.nasa.gov/apod/'
     site_encoding = 'windows-1252'
@@ -137,11 +188,10 @@ def main():
         if versions:
             result = scraperwiki.sql.select('url, data_version FROM data_versions WHERE url = "%s" LIMIT 1' % entry.entry_url)
 
-        # Only scrape and save the page if it contains a picture (APOD sometimes
-        # publishes videos instead) and if it has not already been scraped at
-        # this version.
-        if (not versions or not result or result[0]['data_version'] != version) and entry.picture_url:
-            save(entry.entry_url, entry.date, entry.title, entry.explanation, entry.picture_url, data_version=version)
+        # Only scrape and save the page if it contains a picture or video and
+        # if it has not already been scraped at this version.
+        if (not versions or not result or result[0]['data_version'] != version) and (entry.picture_thumbnail_url or entry.video_url):
+            save(entry.entry_url, entry.date, entry.title, entry.credit, entry.explanation, entry.picture_thumbnail_url, entry.picture_url, entry.video_url, data_version=version)
 
 
 if __name__ == '__main__':

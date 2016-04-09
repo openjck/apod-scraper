@@ -1,0 +1,7 @@
+-r requirements-scraperwiki.txt
+
+# Manually require the scraperwiki library for all platforms other than
+# ScraperWiki itself (for example, morph.io). If the scraperwiki library is
+# installed on ScraperWiki itself, the database will be stored someplace
+# unexpected and ScraperWiki will report that the database is empty.
+-e git+http://github.com/openaustralia/scraperwiki-python.git@morph_defaults#egg=scraperwiki

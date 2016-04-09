@@ -1,0 +1,6 @@
+bleach
+beautifulsoup4
+lxml
+python-dateutil
+regex
+requests
