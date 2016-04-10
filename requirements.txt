@@ -1,7 +1,10 @@
--r requirements-scraperwiki.txt
+# Global requirements (see comment in requirements-scraperwiki.txt)
+bleach
+beautifulsoup4
+lxml
+python-dateutil
+regex
+requests
 
-# Manually require the scraperwiki library for all platforms other than
-# ScraperWiki itself (for example, morph.io). If the scraperwiki library is
-# installed on ScraperWiki itself, the database will be stored someplace
-# unexpected and ScraperWiki will report that the database is empty.
+# Needed everywhere but ScraperWiki
 -e git+http://github.com/openaustralia/scraperwiki-python.git@morph_defaults#egg=scraperwiki
